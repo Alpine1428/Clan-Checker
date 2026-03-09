@@ -1,23 +1,17 @@
-@rem
 @rem Gradle startup script for Windows
-@rem
-
 @if "%DEBUG%"=="" @echo off
 
-@rem Set local scope for the variables with windows NT shell
 if "%OS%"=="Windows_NT" setlocal
 
-set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
+set DEFAULT_JVM_OPTS=-Xmx64m -Xms64m
 
 set DIRNAME=%~dp0
 if "%DIRNAME%"=="" set DIRNAME=.
-@rem This is normally unused
 set APP_BASE_NAME=%~n0
 set APP_HOME=%DIRNAME%
 
 set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
 
-@rem Find java.exe
 if defined JAVA_HOME goto findJavaFromJavaHome
 
 set JAVA_EXE=java.exe
@@ -44,5 +38,3 @@ goto fail
 
 :end
 if "%OS%"=="Windows_NT" endlocal
-
-:omega
