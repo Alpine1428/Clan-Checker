@@ -3,6 +3,7 @@ package com.clanchecker;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.screen.GenericContainerScreenHandler;
 import net.minecraft.screen.slot.Slot;
 import net.minecraft.text.Text;
@@ -10,14 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
-/**
- * Менеджер сканирования кланов.
- * Считывает предметы из слотов инвентаря /clan list и проверяет их названия.
- */
 public class ClanScanManager {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("ClanChecker");
@@ -25,30 +20,30 @@ public class ClanScanManager {
 
     public enum ScanState {
         IDLE,
+        WAITING,
         SCANNING,
         DONE
     }
 
     private ScanState state = ScanState.IDLE;
     private final List<ViolationDatabase.ViolationResult> violations = new ArrayList<>();
+    private final List<ScannedClan> allClans = new ArrayList<>();
     private boolean scanComplete = false;
     private int selectedViolationIndex = -1;
     private int hoverSlot = -1;
+    private int waitTicks = 0;
+    private String lastScreenTitle = "";
 
-    // Слоты, которые содержат кланы (10-36, исключая 10, 18, 19, 27, 28, 36)
-    private static final Set<Integer> CLAN_SLOTS = new HashSet<>();
+    public static class ScannedClan {
+        public final String name;
+        public final int slot;
+        public final boolean hasViolation;
 
-    static {
-        // Слоты с 10 по 36, исключая 10, 18, 19, 27, 28, 36
-        for (int i = 10; i <= 36; i++) {
-            CLAN_SLOTS.add(i);
+        public ScannedClan(String name, int slot, boolean hasViolation) {
+            this.name = name;
+            this.slot = slot;
+            this.hasViolation = hasViolation;
         }
-        CLAN_SLOTS.remove(10);
-        CLAN_SLOTS.remove(18);
-        CLAN_SLOTS.remove(19);
-        CLAN_SLOTS.remove(27);
-        CLAN_SLOTS.remove(28);
-        CLAN_SLOTS.remove(36);
     }
 
     public static ClanScanManager getInstance() {
@@ -58,33 +53,49 @@ public class ClanScanManager {
         return instance;
     }
 
-    /**
-     * Запускает сканирование при нажатии клавиши.
-     */
     public void startScan(MinecraftClient client) {
-        if (client.currentScreen instanceof GenericContainerScreen) {
-            LOGGER.info("[ClanChecker] Начинаем сканирование кланов...");
-            state = ScanState.SCANNING;
+        if (client.currentScreen instanceof GenericContainerScreen containerScreen) {
+            String title = containerScreen.getTitle().getString();
+            LOGGER.info("[ClanChecker] Начинаем сканирование... Заголовок: '{}'", title);
+            lastScreenTitle = title;
+            state = ScanState.WAITING;
+            waitTicks = 5;
             violations.clear();
+            allClans.clear();
             scanComplete = false;
             selectedViolationIndex = -1;
             hoverSlot = -1;
-            performScan(client);
-        } else {
-            LOGGER.warn("[ClanChecker] Откройте меню /clan list перед сканированием!");
-            // Отправляем сообщение в чат
+
             if (client.player != null) {
                 client.player.sendMessage(
-                        Text.literal("§c[ClanChecker] §fОткройте меню §e/clan list §fперед сканированием!"),
+                        Text.literal("§e[ClanChecker] §fСканирование..."),
+                        false
+                );
+            }
+        } else {
+            if (client.player != null) {
+                client.player.sendMessage(
+                        Text.literal("§c[ClanChecker] §fОткройте меню §e/clan list §fи нажмите R!"),
                         false
                 );
             }
         }
     }
 
-    /**
-     * Выполняет сканирование всех слотов в открытом инвентаре.
-     */
+    public void tick(MinecraftClient client) {
+        if (state == ScanState.WAITING) {
+            if (!(client.currentScreen instanceof GenericContainerScreen)) {
+                state = ScanState.IDLE;
+                return;
+            }
+            waitTicks--;
+            if (waitTicks <= 0) {
+                state = ScanState.SCANNING;
+                performScan(client);
+            }
+        }
+    }
+
     private void performScan(MinecraftClient client) {
         if (!(client.currentScreen instanceof GenericContainerScreen containerScreen)) {
             state = ScanState.IDLE;
@@ -93,51 +104,60 @@ public class ClanScanManager {
 
         GenericContainerScreenHandler handler = containerScreen.getScreenHandler();
         int totalSlots = handler.slots.size();
+        int containerSlots = handler.getRows() * 9;
+
+        LOGGER.info("[ClanChecker] Всего слотов: {}, Контейнер: {}, Рядов: {}",
+                totalSlots, containerSlots, handler.getRows());
 
         int clansChecked = 0;
 
-        for (int slotIndex : CLAN_SLOTS) {
-            if (slotIndex >= totalSlots) continue;
-
+        for (int slotIndex = 0; slotIndex < containerSlots && slotIndex < totalSlots; slotIndex++) {
             Slot slot = handler.getSlot(slotIndex);
             ItemStack stack = slot.getStack();
 
             if (stack.isEmpty()) continue;
 
-            // Получаем название предмета (название клана)
+            if (isDecorativeItem(stack)) {
+                LOGGER.debug("[ClanChecker] Слот {} — декоративный: {}", slotIndex,
+                        net.minecraft.registry.Registries.ITEM.getId(stack.getItem()));
+                continue;
+            }
+
             String clanName = extractClanName(stack);
             if (clanName == null || clanName.isEmpty()) continue;
 
             clansChecked++;
 
-            // Проверяем название
             List<ViolationDatabase.ViolationResult> results = ViolationDatabase.checkClanName(clanName, slotIndex);
             violations.addAll(results);
 
-            LOGGER.info("[ClanChecker] Проверен клан '{}' в слоте {} — нарушений: {}",
-                    clanName, slotIndex, results.size());
+            boolean hasViolation = !results.isEmpty();
+            allClans.add(new ScannedClan(clanName, slotIndex, hasViolation));
+
+            LOGGER.info("[ClanChecker] Слот {}: '{}' — нарушений: {}",
+                    slotIndex, clanName, results.size());
         }
 
         scanComplete = true;
         state = ScanState.DONE;
 
-        LOGGER.info("[ClanChecker] Сканирование завершено. Проверено кланов: {}, Нарушений: {}",
+        LOGGER.info("[ClanChecker] Завершено. Проверено: {}, Нарушений: {}",
                 clansChecked, violations.size());
 
         if (client.player != null) {
             if (violations.isEmpty()) {
                 client.player.sendMessage(
-                        Text.literal("§a[ClanChecker] §fСканирование завершено. §aНарушений не обнаружено! §7(Проверено: " + clansChecked + ")"),
+                        Text.literal("§a[ClanChecker] ✓ §fНарушений нет! §7(Кланов: " + clansChecked + ")"),
                         false
                 );
             } else {
                 client.player.sendMessage(
-                        Text.literal("§c[ClanChecker] §fСканирование завершено. §cНайдено нарушений: " + violations.size() + " §7(Проверено: " + clansChecked + ")"),
+                        Text.literal("§c[ClanChecker] ✗ §fНарушений: §c" + violations.size() + " §7(Кланов: " + clansChecked + ")"),
                         false
                 );
                 for (ViolationDatabase.ViolationResult v : violations) {
                     client.player.sendMessage(
-                            Text.literal("  §e" + v.clanName + " §7— §c" + v.category + " §7(\"" + v.matchedWord + "\")"),
+                            Text.literal("  §e► " + v.clanName + " §7— §c" + v.category + " §7(\"" + v.matchedWord + "\")"),
                             false
                     );
                 }
@@ -145,53 +165,33 @@ public class ClanScanManager {
         }
     }
 
-    /**
-     * Извлекает название клана из ItemStack.
-     * Формат: "clanname | 1 уровень" — берём часть до |
-     */
+    private boolean isDecorativeItem(ItemStack stack) {
+        String itemId = net.minecraft.registry.Registries.ITEM.getId(stack.getItem()).toString();
+        if (itemId.contains("stained_glass_pane") || itemId.contains("glass_pane")) return true;
+        if (stack.getItem() == Items.BARRIER) return true;
+        if (stack.getItem() == Items.ARROW) return true;
+        if (itemId.contains("gray_dye") || itemId.contains("light_gray_dye")) return true;
+        return false;
+    }
+
     private String extractClanName(ItemStack stack) {
-        if (!stack.hasCustomName()) {
-            Text name = stack.getName();
-            if (name != null) {
-                String fullName = name.getString();
-                // Убираем форматирование
-                fullName = fullName.replaceAll("§.", "");
-                // Если есть разделитель |, берём часть до него
-                if (fullName.contains("|")) {
-                    return fullName.split("\\|")[0].trim();
-                }
-                return fullName.trim();
-            }
-            return null;
-        }
+        Text name = stack.getName();
+        if (name == null) return null;
 
-        Text customName = stack.getName();
-        if (customName != null) {
-            String fullName = customName.getString();
-            fullName = fullName.replaceAll("§.", "");
-            if (fullName.contains("|")) {
-                return fullName.split("\\|")[0].trim();
-            }
-            return fullName.trim();
+        String fullName = name.getString();
+        if (fullName.isEmpty()) return null;
+
+        fullName = fullName.replaceAll("§[0-9a-fk-or]", "");
+
+        if (fullName.contains("|")) {
+            return fullName.split("\\|")[0].trim();
         }
-        return null;
+        if (fullName.contains("(")) {
+            return fullName.split("\\(")[0].trim();
+        }
+        return fullName.trim();
     }
 
-    /**
-     * Тик — обрабатывается каждый клиентский тик.
-     */
-    public void tick(MinecraftClient client) {
-        // Если экран закрыт — сбрасываем состояние
-        if (!(client.currentScreen instanceof GenericContainerScreen)) {
-            if (state == ScanState.DONE) {
-                // Оставляем результаты доступными даже после закрытия
-            }
-        }
-    }
-
-    /**
-     * Выбирает нарушение по индексу и устанавливает слот для наведения.
-     */
     public void selectViolation(int index) {
         if (index >= 0 && index < violations.size()) {
             selectedViolationIndex = index;
@@ -199,18 +199,12 @@ public class ClanScanManager {
         }
     }
 
-    /**
-     * Выбирает следующее нарушение.
-     */
     public void selectNext() {
         if (violations.isEmpty()) return;
         selectedViolationIndex = (selectedViolationIndex + 1) % violations.size();
         hoverSlot = violations.get(selectedViolationIndex).slot;
     }
 
-    /**
-     * Выбирает предыдущее нарушение.
-     */
     public void selectPrevious() {
         if (violations.isEmpty()) return;
         selectedViolationIndex--;
@@ -218,36 +212,20 @@ public class ClanScanManager {
         hoverSlot = violations.get(selectedViolationIndex).slot;
     }
 
-    /**
-     * Сбрасывает сканирование.
-     */
     public void reset() {
         state = ScanState.IDLE;
         violations.clear();
+        allClans.clear();
         scanComplete = false;
         selectedViolationIndex = -1;
         hoverSlot = -1;
     }
 
-    // --- Getters ---
-
-    public ScanState getState() {
-        return state;
-    }
-
-    public List<ViolationDatabase.ViolationResult> getViolations() {
-        return violations;
-    }
-
-    public boolean isScanComplete() {
-        return scanComplete;
-    }
-
-    public int getSelectedViolationIndex() {
-        return selectedViolationIndex;
-    }
-
-    public int getHoverSlot() {
-        return hoverSlot;
-    }
+    public ScanState getState() { return state; }
+    public List<ViolationDatabase.ViolationResult> getViolations() { return violations; }
+    public List<ScannedClan> getAllClans() { return allClans; }
+    public boolean isScanComplete() { return scanComplete; }
+    public int getSelectedViolationIndex() { return selectedViolationIndex; }
+    public int getHoverSlot() { return hoverSlot; }
+    public String getLastScreenTitle() { return lastScreenTitle; }
 }

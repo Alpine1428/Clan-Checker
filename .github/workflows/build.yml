@@ -1,42 +1,36 @@
-name: Build Clan Checker
+name: Build Mod
 
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
-      - name: Setup Gradle memory
-        run: |
-          mkdir -p ~/.gradle
-          echo "org.gradle.jvmargs=-Xmx4G -Xms1G -XX:+UseG1GC" >> ~/.gradle/gradle.properties
-          echo "org.gradle.daemon=false" >> ~/.gradle/gradle.properties
+      - name: Grant execute permission
+        run: chmod +x ./gradlew
 
       - name: Build with Gradle
         run: ./gradlew build --no-daemon --stacktrace
-        env:
-          GRADLE_OPTS: "-Xmx4G -Xms1G -XX:+UseG1GC"
-          JAVA_OPTS: "-Xmx4G -Xms1G"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: clan-checker-mod
           path: build/libs/*.jar
+          if-no-files-found: error

@@ -20,7 +20,6 @@ public class ClanCheckerMod implements ClientModInitializer {
     public void onInitializeClient() {
         LOGGER.info("[ClanChecker] Мод загружен!");
 
-        // Регистрируем клавишу для запуска сканирования (по умолчанию — R)
         scanKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.clanchecker.scan",
                 InputUtil.Type.KEYSYM,
@@ -28,20 +27,13 @@ public class ClanCheckerMod implements ClientModInitializer {
                 "category.clanchecker"
         ));
 
-        // Подписываемся на тик клиента
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            // Нажатие клавиши сканирования
             while (scanKey.wasPressed()) {
                 ClanScanManager.getInstance().startScan(client);
             }
-
-            // Обработка логики сканирования каждый тик
             ClanScanManager.getInstance().tick(client);
         });
 
-        // Регистрируем рендер HUD-оверлея
-        ClanCheckerHud.register();
-
-        LOGGER.info("[ClanChecker] Клавиша сканирования: R (можно изменить в настройках управления)");
+        LOGGER.info("[ClanChecker] Клавиша сканирования: R");
     }
 }

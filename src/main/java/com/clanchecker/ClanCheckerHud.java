@@ -1,135 +1,143 @@
 package com.clanchecker;
 
 import com.clanchecker.mixin.HandledScreenAccessor;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.screen.slot.Slot;
 
 import java.util.List;
 
-/**
- * Отрисовка панели Clan Checker справа от инвентаря кланов.
- */
 public class ClanCheckerHud {
 
     private static int panelX = 0;
     private static int panelY = 0;
-    private static int panelWidth = 160;
+    private static int panelWidth = 170;
     private static int entryHeight = 12;
 
-    public static void register() {
-        HudRenderCallback.EVENT.register((drawContext, tickDelta) -> {
-            MinecraftClient client = MinecraftClient.getInstance();
-            if (client == null) return;
+    public static void renderOverlay(DrawContext drawContext, GenericContainerScreen containerScreen,
+                                      int mouseX, int mouseY, float delta) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null) return;
 
-            if (!(client.currentScreen instanceof GenericContainerScreen containerScreen)) {
-                return;
-            }
-
-            ClanScanManager manager = ClanScanManager.getInstance();
-
-            if (!manager.isScanComplete()) {
-                return;
-            }
-
-            renderPanel(drawContext, client, containerScreen, manager);
-
-            // Если выбрано нарушение — перемещаем курсор на нужный слот
-            int hoverSlot = manager.getHoverSlot();
-            if (hoverSlot >= 0) {
-                moveMouseToSlot(client, containerScreen, hoverSlot);
-            }
-        });
-    }
-
-    private static void renderPanel(DrawContext drawContext, MinecraftClient client,
-                                     GenericContainerScreen containerScreen,
-                                     ClanScanManager manager) {
+        ClanScanManager manager = ClanScanManager.getInstance();
         TextRenderer textRenderer = client.textRenderer;
-        List<ViolationDatabase.ViolationResult> violations = manager.getViolations();
 
         HandledScreenAccessor accessor = (HandledScreenAccessor) containerScreen;
         int guiLeft = accessor.getX();
         int guiTop = accessor.getY();
         int guiWidth = accessor.getBackgroundWidth();
 
-        panelX = guiLeft + guiWidth + 5;
+        panelX = guiLeft + guiWidth + 6;
         panelY = guiTop;
 
-        int headerHeight = 20;
-        int contentHeight = violations.isEmpty() ? 14 : violations.size() * entryHeight + 4;
-        int totalHeight = headerHeight + contentHeight + 20; // +20 для подсказки
+        if (!manager.isScanComplete()) {
+            renderHintPanel(drawContext, textRenderer);
+            return;
+        }
 
-        // Фон панели
+        renderResultsPanel(drawContext, textRenderer, manager, containerScreen);
+    }
+
+    private static void renderHintPanel(DrawContext drawContext, TextRenderer textRenderer) {
+        int totalHeight = 40;
+
         drawContext.fill(panelX - 2, panelY - 2,
                 panelX + panelWidth + 2, panelY + totalHeight + 2,
                 0xCC000000);
 
-        // Рамка (зелёная)
-        int borderColor = 0xFF00AA00;
-        // Верх
+        drawBorder(drawContext, panelX - 2, panelY - 2,
+                panelX + panelWidth + 2, panelY + totalHeight + 2, 0xFF555555);
+
+        drawContext.drawText(textRenderer, "§6§lClan Checker",
+                panelX + 4, panelY + 4, 0xFFAA00, true);
+
+        drawContext.drawText(textRenderer, "§7Нажмите §eR §7для",
+                panelX + 4, panelY + 18, 0x777777, true);
+        drawContext.drawText(textRenderer, "§7сканирования кланов",
+                panelX + 4, panelY + 28, 0x777777, true);
+    }
+
+    private static void renderResultsPanel(DrawContext drawContext, TextRenderer textRenderer,
+                                             ClanScanManager manager,
+                                             GenericContainerScreen containerScreen) {
+        List<ViolationDatabase.ViolationResult> violations = manager.getViolations();
+        List<ClanScanManager.ScannedClan> allClans = manager.getAllClans();
+
+        int headerHeight = 22;
+        int statsHeight = 14;
+        int violationsHeight = violations.isEmpty() ? 16 : (violations.size() * entryHeight + 6);
+        int helpHeight = violations.isEmpty() ? 0 : 14;
+        int totalHeight = headerHeight + statsHeight + violationsHeight + helpHeight + 4;
+
         drawContext.fill(panelX - 2, panelY - 2,
-                panelX + panelWidth + 2, panelY - 1, borderColor);
-        // Низ
-        drawContext.fill(panelX - 2, panelY + totalHeight + 1,
-                panelX + panelWidth + 2, panelY + totalHeight + 2, borderColor);
-        // Лево
-        drawContext.fill(panelX - 2, panelY - 2,
-                panelX - 1, panelY + totalHeight + 2, borderColor);
-        // Право
-        drawContext.fill(panelX + panelWidth + 1, panelY - 2,
+                panelX + panelWidth + 2, panelY + totalHeight + 2,
+                0xDD000000);
+
+        int borderColor = violations.isEmpty() ? 0xFF00AA00 : 0xFFAA0000;
+        drawBorder(drawContext, panelX - 2, panelY - 2,
                 panelX + panelWidth + 2, panelY + totalHeight + 2, borderColor);
 
-        // Заголовок
-        drawContext.drawText(textRenderer, "§a§lClan Checker",
-                panelX + 4, panelY + 4, 0x55FF55, true);
+        String titleColor = violations.isEmpty() ? "§a" : "§c";
+        drawContext.drawText(textRenderer, titleColor + "§lClan Checker",
+                panelX + 4, panelY + 4, 0xFFFFFF, true);
 
-        // Разделительная линия
+        String statusIcon = violations.isEmpty() ? " §a✓" : " §c✗";
+        drawContext.drawText(textRenderer, statusIcon,
+                panelX + panelWidth - 16, panelY + 4, 0xFFFFFF, true);
+
         drawContext.fill(panelX, panelY + headerHeight - 2,
                 panelX + panelWidth, panelY + headerHeight - 1, borderColor);
 
+        int statY = panelY + headerHeight + 2;
+        drawContext.drawText(textRenderer,
+                "§7Кланов: §f" + allClans.size() + " §7| Нарушений: " +
+                        (violations.isEmpty() ? "§a0" : "§c" + violations.size()),
+                panelX + 4, statY, 0xAAAAAA, true);
+
+        int listStartY = statY + statsHeight + 2;
+
         if (violations.isEmpty()) {
-            drawContext.drawText(textRenderer, "§aНарушений нет ✓",
-                    panelX + 4, panelY + headerHeight + 4, 0x55FF55, true);
+            drawContext.drawText(textRenderer, "§a  Всё чисто! ✓",
+                    panelX + 4, listStartY, 0x55FF55, true);
         } else {
             int selectedIndex = manager.getSelectedViolationIndex();
 
             for (int i = 0; i < violations.size(); i++) {
                 ViolationDatabase.ViolationResult v = violations.get(i);
-                int yPos = panelY + headerHeight + 4 + i * entryHeight;
+                int yPos = listStartY + i * entryHeight;
 
-                // Подсветка выбранного элемента
                 if (i == selectedIndex) {
                     drawContext.fill(panelX, yPos - 1,
                             panelX + panelWidth, yPos + entryHeight - 1, 0x44FFAA00);
                 }
 
                 String displayName = v.clanName;
-                if (displayName.length() > 14) {
-                    displayName = displayName.substring(0, 12) + "..";
+                if (displayName.length() > 10) {
+                    displayName = displayName.substring(0, 9) + "…";
                 }
 
                 String prefix = (i == selectedIndex) ? "§e▶ " : "§c• ";
-                drawContext.drawText(textRenderer, prefix + displayName,
+                String categoryShort = shortenCategory(v.category);
+
+                drawContext.drawText(textRenderer,
+                        prefix + "§f" + displayName + " §8| §c" + categoryShort,
                         panelX + 4, yPos, 0xFFAA00, true);
             }
 
-            // Подсказки управления
-            int helpY = panelY + headerHeight + 4 + violations.size() * entryHeight + 6;
-            drawContext.drawText(textRenderer, "§7↑↓ выбор | клик",
-                    panelX + 4, helpY, 0x777777, true);
+            int helpY = listStartY + violations.size() * entryHeight + 4;
+            drawContext.drawText(textRenderer, "§8↑↓ навигация | клик выбор",
+                    panelX + 4, helpY, 0x555555, true);
+        }
+
+        if (manager.getHoverSlot() >= 0) {
+            highlightSlot(drawContext, containerScreen, manager.getHoverSlot());
         }
     }
 
-    /**
-     * Перемещает курсор мыши к центру указанного слота.
-     */
-    private static void moveMouseToSlot(MinecraftClient client,
-                                         GenericContainerScreen containerScreen, int slotIndex) {
+    private static void highlightSlot(DrawContext drawContext,
+                                       GenericContainerScreen containerScreen, int slotIndex) {
         try {
             var handler = containerScreen.getScreenHandler();
             if (slotIndex >= handler.slots.size()) return;
@@ -137,26 +145,39 @@ public class ClanCheckerHud {
             HandledScreenAccessor accessor = (HandledScreenAccessor) containerScreen;
             Slot slot = handler.getSlot(slotIndex);
 
-            int slotScreenX = accessor.getX() + slot.x + 8;
-            int slotScreenY = accessor.getY() + slot.y + 8;
+            int x = accessor.getX() + slot.x;
+            int y = accessor.getY() + slot.y;
 
-            double scaleFactor = client.getWindow().getScaleFactor();
-            double mouseX = slotScreenX * scaleFactor;
-            double mouseY = slotScreenY * scaleFactor;
+            drawContext.fill(x, y, x + 16, y + 16, 0x55FF0000);
 
-            org.lwjgl.glfw.GLFW.glfwSetCursorPos(
-                    client.getWindow().getHandle(),
-                    mouseX, mouseY
-            );
+            int c = 0xFFFF0000;
+            drawContext.fill(x - 1, y - 1, x + 17, y, c);
+            drawContext.fill(x - 1, y + 16, x + 17, y + 17, c);
+            drawContext.fill(x - 1, y, x, y + 16, c);
+            drawContext.fill(x + 16, y, x + 17, y + 16, c);
         } catch (Exception e) {
-            ClanCheckerMod.LOGGER.error("[ClanChecker] Ошибка перемещения курсора: {}", e.getMessage());
+            // ignore
         }
     }
 
-    /**
-     * Обработка клика мышью по панели.
-     * Возвращает true если клик обработан.
-     */
+    private static String shortenCategory(String category) {
+        return switch (category) {
+            case "Читы/Макросы/ПО" -> "Читы";
+            case "Нецензурная лексика" -> "Мат";
+            case "Оскорбления" -> "Оскорб.";
+            case "Политика" -> "Полит.";
+            case "18+ контент" -> "18+";
+            default -> category;
+        };
+    }
+
+    private static void drawBorder(DrawContext ctx, int x1, int y1, int x2, int y2, int color) {
+        ctx.fill(x1, y1, x2, y1 + 1, color);
+        ctx.fill(x1, y2 - 1, x2, y2, color);
+        ctx.fill(x1, y1, x1 + 1, y2, color);
+        ctx.fill(x2 - 1, y1, x2, y2, color);
+    }
+
     public static boolean handleClick(double mouseX, double mouseY) {
         ClanScanManager manager = ClanScanManager.getInstance();
         if (!manager.isScanComplete()) return false;
@@ -164,9 +185,12 @@ public class ClanCheckerHud {
         List<ViolationDatabase.ViolationResult> violations = manager.getViolations();
         if (violations.isEmpty()) return false;
 
-        int headerHeight = 20;
+        int headerHeight = 22;
+        int statsHeight = 14;
+        int listStartY = panelY + headerHeight + 2 + statsHeight + 2;
+
         for (int i = 0; i < violations.size(); i++) {
-            int yPos = panelY + headerHeight + 4 + i * entryHeight;
+            int yPos = listStartY + i * entryHeight;
             if (mouseX >= panelX && mouseX <= panelX + panelWidth &&
                     mouseY >= yPos - 1 && mouseY <= yPos + entryHeight - 1) {
                 manager.selectViolation(i);
