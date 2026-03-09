@@ -44,18 +44,17 @@ public class ClanCheckerHud {
         int totalHeight = 40;
 
         drawContext.fill(panelX - 2, panelY - 2,
-                panelX + panelWidth + 2, panelY + totalHeight + 2,
-                0xCC000000);
+                panelX + panelWidth + 2, panelY + totalHeight + 2, 0xCC000000);
 
         drawBorder(drawContext, panelX - 2, panelY - 2,
                 panelX + panelWidth + 2, panelY + totalHeight + 2, 0xFF555555);
 
-        drawContext.drawText(textRenderer, "§6§lClan Checker",
+        drawContext.drawText(textRenderer, "\u00a76\u00a7lClan Checker",
                 panelX + 4, panelY + 4, 0xFFAA00, true);
 
-        drawContext.drawText(textRenderer, "§7Нажмите §eR §7для",
+        drawContext.drawText(textRenderer, "\u00a77Press \u00a7eR \u00a77to",
                 panelX + 4, panelY + 18, 0x777777, true);
-        drawContext.drawText(textRenderer, "§7сканирования кланов",
+        drawContext.drawText(textRenderer, "\u00a77scan clans",
                 panelX + 4, panelY + 28, 0x777777, true);
     }
 
@@ -72,34 +71,28 @@ public class ClanCheckerHud {
         int totalHeight = headerHeight + statsHeight + violationsHeight + helpHeight + 4;
 
         drawContext.fill(panelX - 2, panelY - 2,
-                panelX + panelWidth + 2, panelY + totalHeight + 2,
-                0xDD000000);
+                panelX + panelWidth + 2, panelY + totalHeight + 2, 0xDD000000);
 
         int borderColor = violations.isEmpty() ? 0xFF00AA00 : 0xFFAA0000;
         drawBorder(drawContext, panelX - 2, panelY - 2,
                 panelX + panelWidth + 2, panelY + totalHeight + 2, borderColor);
 
-        String titleColor = violations.isEmpty() ? "§a" : "§c";
-        drawContext.drawText(textRenderer, titleColor + "§lClan Checker",
+        String titlePrefix = violations.isEmpty() ? "\u00a7a" : "\u00a7c";
+        drawContext.drawText(textRenderer, titlePrefix + "\u00a7lClan Checker",
                 panelX + 4, panelY + 4, 0xFFFFFF, true);
-
-        String statusIcon = violations.isEmpty() ? " §a✓" : " §c✗";
-        drawContext.drawText(textRenderer, statusIcon,
-                panelX + panelWidth - 16, panelY + 4, 0xFFFFFF, true);
 
         drawContext.fill(panelX, panelY + headerHeight - 2,
                 panelX + panelWidth, panelY + headerHeight - 1, borderColor);
 
         int statY = panelY + headerHeight + 2;
-        drawContext.drawText(textRenderer,
-                "§7Кланов: §f" + allClans.size() + " §7| Нарушений: " +
-                        (violations.isEmpty() ? "§a0" : "§c" + violations.size()),
-                panelX + 4, statY, 0xAAAAAA, true);
+        String statText = "\u00a77Clans: \u00a7f" + allClans.size() + " \u00a77| Bad: " +
+                (violations.isEmpty() ? "\u00a7a0" : "\u00a7c" + violations.size());
+        drawContext.drawText(textRenderer, statText, panelX + 4, statY, 0xAAAAAA, true);
 
         int listStartY = statY + statsHeight + 2;
 
         if (violations.isEmpty()) {
-            drawContext.drawText(textRenderer, "§a  Всё чисто! ✓",
+            drawContext.drawText(textRenderer, "\u00a7a  All clean!",
                     panelX + 4, listStartY, 0x55FF55, true);
         } else {
             int selectedIndex = manager.getSelectedViolationIndex();
@@ -115,19 +108,19 @@ public class ClanCheckerHud {
 
                 String displayName = v.clanName;
                 if (displayName.length() > 10) {
-                    displayName = displayName.substring(0, 9) + "…";
+                    displayName = displayName.substring(0, 9) + "..";
                 }
 
-                String prefix = (i == selectedIndex) ? "§e▶ " : "§c• ";
-                String categoryShort = shortenCategory(v.category);
+                String prefix = (i == selectedIndex) ? "\u00a7e> " : "\u00a7c- ";
+                String catShort = shortenCategory(v.category);
 
                 drawContext.drawText(textRenderer,
-                        prefix + "§f" + displayName + " §8| §c" + categoryShort,
+                        prefix + "\u00a7f" + displayName + " \u00a78| \u00a7c" + catShort,
                         panelX + 4, yPos, 0xFFAA00, true);
             }
 
             int helpY = listStartY + violations.size() * entryHeight + 4;
-            drawContext.drawText(textRenderer, "§8↑↓ навигация | клик выбор",
+            drawContext.drawText(textRenderer, "\u00a78Up/Down select | click",
                     panelX + 4, helpY, 0x555555, true);
         }
 
@@ -155,20 +148,19 @@ public class ClanCheckerHud {
             drawContext.fill(x - 1, y + 16, x + 17, y + 17, c);
             drawContext.fill(x - 1, y, x, y + 16, c);
             drawContext.fill(x + 16, y, x + 17, y + 16, c);
-        } catch (Exception e) {
-            // ignore
-        }
+        } catch (Exception ignored) {}
     }
 
     private static String shortenCategory(String category) {
-        return switch (category) {
-            case "Читы/Макросы/ПО" -> "Читы";
-            case "Нецензурная лексика" -> "Мат";
-            case "Оскорбления" -> "Оскорб.";
-            case "Политика" -> "Полит.";
-            case "18+ контент" -> "18+";
-            default -> category;
-        };
+        if (category == null) return "?";
+        switch (category) {
+            case "Cheats": return "Cheat";
+            case "Profanity": return "Prof.";
+            case "Insults": return "Insult";
+            case "Politics": return "Polit.";
+            case "NSFW": return "18+";
+            default: return category.length() > 6 ? category.substring(0, 6) : category;
+        }
     }
 
     private static void drawBorder(DrawContext ctx, int x1, int y1, int x2, int y2, int color) {

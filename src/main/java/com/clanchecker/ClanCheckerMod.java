@@ -18,7 +18,7 @@ public class ClanCheckerMod implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        LOGGER.info("[ClanChecker] Мод загружен!");
+        LOGGER.info("[ClanChecker] Mod loaded!");
 
         scanKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.clanchecker.scan",
@@ -34,6 +34,6 @@ public class ClanCheckerMod implements ClientModInitializer {
             ClanScanManager.getInstance().tick(client);
         });
 
-        LOGGER.info("[ClanChecker] Клавиша сканирования: R");
+        LOGGER.info("[ClanChecker] Scan key: R");
     }
 }

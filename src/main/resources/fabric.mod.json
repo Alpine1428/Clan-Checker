@@ -3,13 +3,12 @@
   "id": "clanchecker",
   "version": "${version}",
   "name": "Clan Checker",
-  "description": "Автоматическая проверка названий кланов на нарушения правил сервера HolyWorld",
+  "description": "Automatic clan name violation checker for HolyWorld",
   "authors": ["Alpine1428"],
   "contact": {
     "sources": "https://github.com/Alpine1428/Clan-Checker"
   },
   "license": "MIT",
-  "icon": "assets/clanchecker/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": ["com.clanchecker.ClanCheckerMod"]
