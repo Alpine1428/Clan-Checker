@@ -32,10 +32,18 @@ java {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
     options.release = 17
+    options.fork = true
+    options.forkOptions.memoryMaximumSize = "2g"
 }
 
 jar {
     from("LICENSE") {
         rename { "${it}_${project.archivesBaseName}" }
+    }
+}
+
+loom {
+    runConfigs.configureEach {
+        vmArgs "-Xmx2G"
     }
 }

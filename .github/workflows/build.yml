@@ -23,8 +23,17 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Setup Gradle memory
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.jvmargs=-Xmx4G -Xms1G -XX:+UseG1GC" >> ~/.gradle/gradle.properties
+          echo "org.gradle.daemon=false" >> ~/.gradle/gradle.properties
+
       - name: Build with Gradle
-        run: ./gradlew build
+        run: ./gradlew build --no-daemon --stacktrace
+        env:
+          GRADLE_OPTS: "-Xmx4G -Xms1G -XX:+UseG1GC"
+          JAVA_OPTS: "-Xmx4G -Xms1G"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
