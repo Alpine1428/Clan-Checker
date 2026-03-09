@@ -52,7 +52,7 @@ public class ClanScanManager {
     public void startScan(MinecraftClient client) {
         if (client.currentScreen instanceof GenericContainerScreen) {
             state = ScanState.WAITING;
-            waitTicks = 5;
+            waitTicks = 10; // wait more ticks for items to load
             violations.clear();
             allClans.clear();
             scanComplete = false;
@@ -93,7 +93,7 @@ public class ClanScanManager {
         int totalSlots = handler.slots.size();
         int containerSlots = handler.getRows() * 9;
 
-        LOGGER.info("[ClanChecker] Total slots: {}, Container: {}, Rows: {}",
+        LOGGER.info("[ClanChecker] Slots: {}, Container: {}, Rows: {}",
                 totalSlots, containerSlots, handler.getRows());
 
         int clansChecked = 0;
@@ -107,14 +107,22 @@ public class ClanScanManager {
 
             String clanName = extractClanName(stack);
             if (clanName == null || clanName.isEmpty()) continue;
+            if (clanName.length() < 2) continue; // skip single chars
 
             clansChecked++;
+
+            // Log normalized form for debugging
+            String normalizedName = ViolationDatabase.normalize(clanName);
+            LOGGER.info("[ClanChecker] Slot {}: '{}' -> normalized: '{}'", i, clanName, normalizedName);
 
             List<ViolationDatabase.ViolationResult> results = ViolationDatabase.checkClanName(clanName, i);
             violations.addAll(results);
             allClans.add(new ScannedClan(clanName, i, !results.isEmpty()));
 
-            LOGGER.info("[ClanChecker] Slot {}: '{}' violations: {}", i, clanName, results.size());
+            if (!results.isEmpty()) {
+                LOGGER.warn("[ClanChecker] VIOLATION in slot {}: '{}' -> {}", i, clanName,
+                        results.get(0).category + " (" + results.get(0).matchedWord + ")");
+            }
         }
 
         scanComplete = true;
@@ -123,15 +131,15 @@ public class ClanScanManager {
         if (client.player != null) {
             if (violations.isEmpty()) {
                 client.player.sendMessage(Text.literal(
-                        "\u00a7a[ClanChecker] \u00a7fNo violations found! \u00a77(Clans: " + clansChecked + ")"), false);
+                        "\u00a7a[ClanChecker] \u00a7fNo violations! \u00a77(Clans: " + clansChecked + ")"), false);
             } else {
                 client.player.sendMessage(Text.literal(
                         "\u00a7c[ClanChecker] \u00a7fViolations: \u00a7c" + violations.size() +
                         " \u00a77(Clans: " + clansChecked + ")"), false);
                 for (ViolationDatabase.ViolationResult v : violations) {
                     client.player.sendMessage(Text.literal(
-                            "  \u00a7e> " + v.clanName + " \u00a77- \u00a7c" + v.category +
-                            " \u00a77(\"" + v.matchedWord + "\")"), false);
+                            "  \u00a7e> \u00a7f" + v.clanName + " \u00a77-> \u00a7c" + v.category +
+                            " \u00a77(\"" + v.matchedWord + "\") \u00a78[slot " + v.slot + "]"), false);
                 }
             }
         }
@@ -143,6 +151,12 @@ public class ClanScanManager {
         if (stack.getItem() == Items.BARRIER) return true;
         if (stack.getItem() == Items.ARROW) return true;
         if (itemId.contains("gray_dye")) return true;
+        // Common menu items
+        if (stack.getItem() == Items.PAPER) return false; // paper might have clan info
+        if (stack.getItem() == Items.MAP) return false;
+        if (stack.getItem() == Items.BOOK) return false;
+        if (stack.getItem() == Items.WRITTEN_BOOK) return false;
+        if (stack.getItem() == Items.NAME_TAG) return false;
         return false;
     }
 
@@ -153,14 +167,27 @@ public class ClanScanManager {
         String fullName = name.getString();
         if (fullName.isEmpty()) return null;
 
-        fullName = fullName.replaceAll("\u00a7[0-9a-fk-or]", "");
+        // Remove color codes (both § and literal)
+        fullName = fullName.replaceAll("\u00a7[0-9a-fk-orA-FK-OR]", "");
 
+        // Format: "ClanName | level info"
         if (fullName.contains("|")) {
-            return fullName.split("\\|")[0].trim();
+            fullName = fullName.split("\\|")[0].trim();
         }
+        // Format: "ClanName (number)"
         if (fullName.contains("(")) {
-            return fullName.split("\\(")[0].trim();
+            fullName = fullName.split("\\(")[0].trim();
         }
+        // Format: "[TAG] ClanName"
+        if (fullName.startsWith("[") && fullName.contains("]")) {
+            int bracketEnd = fullName.indexOf(']');
+            // Check both the tag and the rest
+            String tag = fullName.substring(1, bracketEnd).trim();
+            String rest = fullName.substring(bracketEnd + 1).trim();
+            // Return whichever is longer (more likely the clan name)
+            fullName = rest.isEmpty() ? tag : rest;
+        }
+
         return fullName.trim();
     }
 
