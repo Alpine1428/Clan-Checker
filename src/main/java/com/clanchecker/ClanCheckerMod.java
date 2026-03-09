@@ -34,6 +34,6 @@ public class ClanCheckerMod implements ClientModInitializer {
             ClanScanManager.getInstance().tick(client);
         });
 
-        LOGGER.info("[ClanChecker] Scan key: R");
+        LOGGER.info("[ClanChecker] Scan key: R | LMB on slot copies creator");
     }
 }

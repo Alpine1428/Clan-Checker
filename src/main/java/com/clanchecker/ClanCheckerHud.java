@@ -6,6 +6,7 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.GenericContainerScreen;
 import net.minecraft.screen.slot.Slot;
+import net.minecraft.text.Text;
 
 import java.util.List;
 
@@ -13,7 +14,7 @@ public class ClanCheckerHud {
 
     private static int panelX = 0;
     private static int panelY = 0;
-    private static int panelWidth = 170;
+    private static int panelWidth = 180;
     private static int entryHeight = 12;
 
     public static void renderOverlay(DrawContext drawContext, GenericContainerScreen containerScreen,
@@ -41,7 +42,7 @@ public class ClanCheckerHud {
     }
 
     private static void renderHintPanel(DrawContext drawContext, TextRenderer textRenderer) {
-        int totalHeight = 40;
+        int totalHeight = 50;
 
         drawContext.fill(panelX - 2, panelY - 2,
                 panelX + panelWidth + 2, panelY + totalHeight + 2, 0xCC000000);
@@ -52,10 +53,10 @@ public class ClanCheckerHud {
         drawContext.drawText(textRenderer, "\u00a76\u00a7lClan Checker",
                 panelX + 4, panelY + 4, 0xFFAA00, true);
 
-        drawContext.drawText(textRenderer, "\u00a77Press \u00a7eR \u00a77to",
-                panelX + 4, panelY + 18, 0x777777, true);
-        drawContext.drawText(textRenderer, "\u00a77scan clans",
-                panelX + 4, panelY + 28, 0x777777, true);
+        drawContext.drawText(textRenderer, "\u00a77Press \u00a7eR \u00a77to scan clans",
+                panelX + 4, panelY + 20, 0x777777, true);
+        drawContext.drawText(textRenderer, "\u00a77LMB on slot = copy creator",
+                panelX + 4, panelY + 32, 0x777777, true);
     }
 
     private static void renderResultsPanel(DrawContext drawContext, TextRenderer textRenderer,
@@ -67,7 +68,7 @@ public class ClanCheckerHud {
         int headerHeight = 22;
         int statsHeight = 14;
         int violationsHeight = violations.isEmpty() ? 16 : (violations.size() * entryHeight + 6);
-        int helpHeight = violations.isEmpty() ? 0 : 14;
+        int helpHeight = 26;
         int totalHeight = headerHeight + statsHeight + violationsHeight + helpHeight + 4;
 
         drawContext.fill(panelX - 2, panelY - 2,
@@ -92,7 +93,7 @@ public class ClanCheckerHud {
         int listStartY = statY + statsHeight + 2;
 
         if (violations.isEmpty()) {
-            drawContext.drawText(textRenderer, "\u00a7a  All clean!",
+            drawContext.drawText(textRenderer, "\u00a7a  \u2714 All clean!",
                     panelX + 4, listStartY, 0x55FF55, true);
         } else {
             int selectedIndex = manager.getSelectedViolationIndex();
@@ -111,18 +112,20 @@ public class ClanCheckerHud {
                     displayName = displayName.substring(0, 9) + "..";
                 }
 
-                String prefix = (i == selectedIndex) ? "\u00a7e> " : "\u00a7c- ";
+                String prefix = (i == selectedIndex) ? "\u00a7e\u25b6 " : "\u00a7c- ";
                 String catShort = shortenCategory(v.category);
 
                 drawContext.drawText(textRenderer,
                         prefix + "\u00a7f" + displayName + " \u00a78| \u00a7c" + catShort,
                         panelX + 4, yPos, 0xFFAA00, true);
             }
-
-            int helpY = listStartY + violations.size() * entryHeight + 4;
-            drawContext.drawText(textRenderer, "\u00a78Up/Down select | click",
-                    panelX + 4, helpY, 0x555555, true);
         }
+
+        int helpY = listStartY + (violations.isEmpty() ? 16 : violations.size() * entryHeight) + 4;
+        drawContext.drawText(textRenderer, "\u00a78\u2191\u2193 navigate | R rescan",
+                panelX + 4, helpY, 0x555555, true);
+        drawContext.drawText(textRenderer, "\u00a78LMB on slot = copy nick",
+                panelX + 4, helpY + 12, 0x555555, true);
 
         if (manager.getHoverSlot() >= 0) {
             highlightSlot(drawContext, containerScreen, manager.getHoverSlot());
@@ -159,6 +162,7 @@ public class ClanCheckerHud {
             case "Insults": return "Insult";
             case "Politics": return "Polit.";
             case "NSFW": return "18+";
+            case "Server Rules": return "Rules";
             default: return category.length() > 6 ? category.substring(0, 6) : category;
         }
     }
@@ -170,7 +174,7 @@ public class ClanCheckerHud {
         ctx.fill(x2 - 1, y1, x2, y2, color);
     }
 
-    public static boolean handleClick(double mouseX, double mouseY) {
+    public static boolean handlePanelClick(double mouseX, double mouseY) {
         ClanScanManager manager = ClanScanManager.getInstance();
         if (!manager.isScanComplete()) return false;
 
@@ -187,6 +191,50 @@ public class ClanCheckerHud {
                     mouseY >= yPos - 1 && mouseY <= yPos + entryHeight - 1) {
                 manager.selectViolation(i);
                 return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean handleSlotClick(GenericContainerScreen containerScreen,
+                                           double mouseX, double mouseY) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null) return false;
+
+        ClanScanManager manager = ClanScanManager.getInstance();
+        if (!manager.isScanComplete()) return false;
+
+        HandledScreenAccessor accessor = (HandledScreenAccessor) containerScreen;
+        var handler = containerScreen.getScreenHandler();
+        int containerSlots = handler.getRows() * 9;
+
+        for (int i = 0; i < containerSlots && i < handler.slots.size(); i++) {
+            Slot slot = handler.getSlot(i);
+            int slotX = accessor.getX() + slot.x;
+            int slotY = accessor.getY() + slot.y;
+
+            if (mouseX >= slotX && mouseX < slotX + 16 &&
+                mouseY >= slotY && mouseY < slotY + 16) {
+
+                String creator = manager.getCreatorForSlot(i);
+                if (creator == null) {
+                    creator = manager.extractCreatorFromScreen(client, i);
+                }
+
+                if (creator != null && !creator.isEmpty()) {
+                    client.keyboard.setClipboard(creator);
+                    if (client.player != null) {
+                        client.player.sendMessage(Text.literal(
+                            "\u00a7a[ClanChecker] \u00a7fCopied: \u00a7b" + creator), false);
+                    }
+                    return true;
+                } else {
+                    if (client.player != null) {
+                        client.player.sendMessage(Text.literal(
+                            "\u00a7c[ClanChecker] \u00a7fCreator not found in lore"), false);
+                    }
+                    return false;
+                }
             }
         }
         return false;

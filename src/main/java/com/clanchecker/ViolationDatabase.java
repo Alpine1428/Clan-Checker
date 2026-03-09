@@ -1,9 +1,6 @@
 package com.clanchecker;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ViolationDatabase {
 
@@ -21,635 +18,741 @@ public class ViolationDatabase {
         }
     }
 
-    // =====================================================================
-    // NORMALIZATION MAP: all tricky characters -> normal latin letters
-    // =====================================================================
-    private static final Map<Character, Character> CHAR_MAP = new HashMap<>();
+    private static final Map<Character, String> CHAR_MAP = new HashMap<>();
 
     static {
-        // Cyrillic -> Latin
-        mapChars("\u0430a"); // a
-        mapChars("\u0431b"); // б
-        mapChars("\u0432v"); // в
-        mapChars("\u0433g"); // г
-        mapChars("\u0434d"); // д
-        mapChars("\u0435e"); // е
-        mapChars("\u0451e"); // ё -> e
-        mapChars("\u0436zh"); // ж (special, handled separately)
-        mapChars("\u0437z"); // з
-        mapChars("\u0438i"); // и
-        mapChars("\u0439i"); // й -> i
-        mapChars("\u043ai"); // к -> k (handled below)
-        mapChars("\u043bl"); // л
-        mapChars("\u043cm"); // м
-        mapChars("\u043dn"); // н
-        mapChars("\u043eo"); // о
-        mapChars("\u043fp"); // п -> p
-        mapChars("\u0440r"); // р
-        mapChars("\u0441s"); // с -> s (looks like c)
-        mapChars("\u0442t"); // т
-        mapChars("\u0443u"); // у
-        mapChars("\u0444f"); // ф
-        mapChars("\u0445h"); // х -> h
-        mapChars("\u0446c"); // ц -> c
-        mapChars("\u0447ch"); // ч (special)
-        mapChars("\u0448sh"); // ш (special)
-        mapChars("\u0449sh"); // щ (special)
-        // ъ, ь -> skip
-        mapChars("\u044by"); // ы -> y
-        // ь -> skip
-        mapChars("\u044de"); // э -> e
-        mapChars("\u044eu"); // ю -> u
-        mapChars("\u044fa"); // я -> a
+        // Cyrillic lowercase -> Latin
+        CHAR_MAP.put('\u0430', "a");  CHAR_MAP.put('\u0431', "b");
+        CHAR_MAP.put('\u0432', "v");  CHAR_MAP.put('\u0433', "g");
+        CHAR_MAP.put('\u0434', "d");  CHAR_MAP.put('\u0435', "e");
+        CHAR_MAP.put('\u0451', "e");  CHAR_MAP.put('\u0436', "zh");
+        CHAR_MAP.put('\u0437', "z");  CHAR_MAP.put('\u0438', "i");
+        CHAR_MAP.put('\u0439', "i");  CHAR_MAP.put('\u043a', "k");
+        CHAR_MAP.put('\u043b', "l");  CHAR_MAP.put('\u043c', "m");
+        CHAR_MAP.put('\u043d', "n");  CHAR_MAP.put('\u043e', "o");
+        CHAR_MAP.put('\u043f', "p");  CHAR_MAP.put('\u0440', "r");
+        CHAR_MAP.put('\u0441', "s");  CHAR_MAP.put('\u0442', "t");
+        CHAR_MAP.put('\u0443', "u");  CHAR_MAP.put('\u0444', "f");
+        CHAR_MAP.put('\u0445', "h");  CHAR_MAP.put('\u0446', "ts");
+        CHAR_MAP.put('\u0447', "ch"); CHAR_MAP.put('\u0448', "sh");
+        CHAR_MAP.put('\u0449', "sch"); CHAR_MAP.put('\u044a', "");
+        CHAR_MAP.put('\u044b', "y");  CHAR_MAP.put('\u044c', "");
+        CHAR_MAP.put('\u044d', "e");  CHAR_MAP.put('\u044e', "yu");
+        CHAR_MAP.put('\u044f', "ya");
 
-        // Leet speak: numbers -> letters
-        CHAR_MAP.put('0', 'o');
-        CHAR_MAP.put('1', 'i');
-        CHAR_MAP.put('2', 'z');
-        CHAR_MAP.put('3', 'e');
-        CHAR_MAP.put('4', 'a');
-        CHAR_MAP.put('5', 's');
-        CHAR_MAP.put('6', 'g');
-        CHAR_MAP.put('7', 't');
-        CHAR_MAP.put('8', 'b');
-        CHAR_MAP.put('9', 'g');
+        // Cyrillic uppercase -> Latin
+        CHAR_MAP.put('\u0410', "a");  CHAR_MAP.put('\u0411', "b");
+        CHAR_MAP.put('\u0412', "v");  CHAR_MAP.put('\u0413', "g");
+        CHAR_MAP.put('\u0414', "d");  CHAR_MAP.put('\u0415', "e");
+        CHAR_MAP.put('\u0401', "e");  CHAR_MAP.put('\u0416', "zh");
+        CHAR_MAP.put('\u0417', "z");  CHAR_MAP.put('\u0418', "i");
+        CHAR_MAP.put('\u0419', "i");  CHAR_MAP.put('\u041a', "k");
+        CHAR_MAP.put('\u041b', "l");  CHAR_MAP.put('\u041c', "m");
+        CHAR_MAP.put('\u041d', "n");  CHAR_MAP.put('\u041e', "o");
+        CHAR_MAP.put('\u041f', "p");  CHAR_MAP.put('\u0420', "r");
+        CHAR_MAP.put('\u0421', "s");  CHAR_MAP.put('\u0422', "t");
+        CHAR_MAP.put('\u0423', "u");  CHAR_MAP.put('\u0424', "f");
+        CHAR_MAP.put('\u0425', "h");  CHAR_MAP.put('\u0426', "ts");
+        CHAR_MAP.put('\u0427', "ch"); CHAR_MAP.put('\u0428', "sh");
+        CHAR_MAP.put('\u0429', "sch"); CHAR_MAP.put('\u042a', "");
+        CHAR_MAP.put('\u042b', "y");  CHAR_MAP.put('\u042c', "");
+        CHAR_MAP.put('\u042d', "e");  CHAR_MAP.put('\u042e', "yu");
+        CHAR_MAP.put('\u042f', "ya");
 
-        // Special unicode lookalikes
-        CHAR_MAP.put('\u00e0', 'a'); // à
-        CHAR_MAP.put('\u00e1', 'a'); // á
-        CHAR_MAP.put('\u00e2', 'a'); // â
-        CHAR_MAP.put('\u00e3', 'a'); // ã
-        CHAR_MAP.put('\u00e4', 'a'); // ä
-        CHAR_MAP.put('\u00e5', 'a'); // å
-        CHAR_MAP.put('\u00e8', 'e'); // è
-        CHAR_MAP.put('\u00e9', 'e'); // é
-        CHAR_MAP.put('\u00ea', 'e'); // ê
-        CHAR_MAP.put('\u00eb', 'e'); // ë
-        CHAR_MAP.put('\u00ec', 'i'); // ì
-        CHAR_MAP.put('\u00ed', 'i'); // í
-        CHAR_MAP.put('\u00ee', 'i'); // î
-        CHAR_MAP.put('\u00ef', 'i'); // ï
-        CHAR_MAP.put('\u00f2', 'o'); // ò
-        CHAR_MAP.put('\u00f3', 'o'); // ó
-        CHAR_MAP.put('\u00f4', 'o'); // ô
-        CHAR_MAP.put('\u00f5', 'o'); // õ
-        CHAR_MAP.put('\u00f6', 'o'); // ö
-        CHAR_MAP.put('\u00f9', 'u'); // ù
-        CHAR_MAP.put('\u00fa', 'u'); // ú
-        CHAR_MAP.put('\u00fb', 'u'); // û
-        CHAR_MAP.put('\u00fc', 'u'); // ü
-        CHAR_MAP.put('\u00fd', 'y'); // ý
-        CHAR_MAP.put('\u00ff', 'y'); // ÿ
-        CHAR_MAP.put('\u00f1', 'n'); // ñ
-        CHAR_MAP.put('\u00e7', 'c'); // ç
-        CHAR_MAP.put('\u00df', 's'); // ß
+        // Leet speak
+        CHAR_MAP.put('0', "o"); CHAR_MAP.put('1', "i");
+        CHAR_MAP.put('2', "z"); CHAR_MAP.put('3', "e");
+        CHAR_MAP.put('4', "a"); CHAR_MAP.put('5', "s");
+        CHAR_MAP.put('6', "g"); CHAR_MAP.put('7', "t");
+        CHAR_MAP.put('8', "b"); CHAR_MAP.put('9', "g");
 
-        // Cyrillic lookalikes used to bypass filters
-        CHAR_MAP.put('\u0410', 'a'); // А
-        CHAR_MAP.put('\u0412', 'b'); // В -> b
-        CHAR_MAP.put('\u0415', 'e'); // Е
-        CHAR_MAP.put('\u041a', 'k'); // К
-        CHAR_MAP.put('\u041c', 'm'); // М
-        CHAR_MAP.put('\u041d', 'h'); // Н -> h
-        CHAR_MAP.put('\u041e', 'o'); // О
-        CHAR_MAP.put('\u0420', 'p'); // Р -> p
-        CHAR_MAP.put('\u0421', 'c'); // С -> c
-        CHAR_MAP.put('\u0422', 't'); // Т
-        CHAR_MAP.put('\u0423', 'y'); // У -> y
-        CHAR_MAP.put('\u0425', 'x'); // Х -> x
-        CHAR_MAP.put('\u042a', ' '); // Ъ
-        CHAR_MAP.put('\u042c', ' '); // Ь
+        // Accented Latin
+        CHAR_MAP.put('\u00e0', "a"); CHAR_MAP.put('\u00e1', "a");
+        CHAR_MAP.put('\u00e2', "a"); CHAR_MAP.put('\u00e3', "a");
+        CHAR_MAP.put('\u00e4', "a"); CHAR_MAP.put('\u00e5', "a");
+        CHAR_MAP.put('\u00e6', "ae"); CHAR_MAP.put('\u00e7', "c");
+        CHAR_MAP.put('\u00e8', "e"); CHAR_MAP.put('\u00e9', "e");
+        CHAR_MAP.put('\u00ea', "e"); CHAR_MAP.put('\u00eb', "e");
+        CHAR_MAP.put('\u00ec', "i"); CHAR_MAP.put('\u00ed', "i");
+        CHAR_MAP.put('\u00ee', "i"); CHAR_MAP.put('\u00ef', "i");
+        CHAR_MAP.put('\u00f0', "d"); CHAR_MAP.put('\u00f1', "n");
+        CHAR_MAP.put('\u00f2', "o"); CHAR_MAP.put('\u00f3', "o");
+        CHAR_MAP.put('\u00f4', "o"); CHAR_MAP.put('\u00f5', "o");
+        CHAR_MAP.put('\u00f6', "o"); CHAR_MAP.put('\u00f8', "o");
+        CHAR_MAP.put('\u00f9', "u"); CHAR_MAP.put('\u00fa', "u");
+        CHAR_MAP.put('\u00fb', "u"); CHAR_MAP.put('\u00fc', "u");
+        CHAR_MAP.put('\u00fd', "y"); CHAR_MAP.put('\u00ff', "y");
+        CHAR_MAP.put('\u00df', "ss");
 
-        // Common symbol substitutions
-        CHAR_MAP.put('@', 'a');
-        CHAR_MAP.put('$', 's');
-        CHAR_MAP.put('!', 'i');
-        CHAR_MAP.put('|', 'l');
-        CHAR_MAP.put('+', 't');
-        CHAR_MAP.put('(', 'c');
-        CHAR_MAP.put('{', 'c');
-        CHAR_MAP.put('[', 'c');
-    }
+        // Symbols
+        CHAR_MAP.put('@', "a"); CHAR_MAP.put('$', "s");
+        CHAR_MAP.put('!', "i"); CHAR_MAP.put('|', "l");
+        CHAR_MAP.put('+', "t"); CHAR_MAP.put('(', "c");
+        CHAR_MAP.put('{', "c"); CHAR_MAP.put('[', "c");
+        CHAR_MAP.put(')', "d"); CHAR_MAP.put('}', "d");
+        CHAR_MAP.put(']', "d");
 
-    private static void mapChars(String mapping) {
-        if (mapping.length() >= 2) {
-            CHAR_MAP.put(mapping.charAt(0), mapping.charAt(1));
+        // Fullwidth Latin
+        for (char c = '\uff21'; c <= '\uff3a'; c++) {
+            CHAR_MAP.put(c, String.valueOf((char) ('a' + (c - '\uff21'))));
+        }
+        for (char c = '\uff41'; c <= '\uff5a'; c++) {
+            CHAR_MAP.put(c, String.valueOf((char) ('a' + (c - '\uff41'))));
         }
     }
 
-    /**
-     * Normalize string: remove junk, map all tricky chars to latin.
-     */
     public static String normalize(String input) {
         if (input == null) return "";
         StringBuilder sb = new StringBuilder();
-        for (char c : input.toLowerCase().toCharArray()) {
-            // Skip separators and decorations
-            if (c == '_' || c == '-' || c == '.' || c == ' ' || c == '*'
-                || c == '#' || c == '~' || c == '`' || c == '\''
-                || c == '"' || c == ',' || c == ';' || c == ':'
-                || c == '/' || c == '\\' || c == '<' || c == '>'
-                || c == '^' || c == '=' || c == '%' || c == '&') {
-                continue;
-            }
-            Character mapped = CHAR_MAP.get(c);
+        String lower = input.toLowerCase();
+        for (int i = 0; i < lower.length(); i++) {
+            char c = lower.charAt(i);
+            if (isSeparator(c)) continue;
+            String mapped = CHAR_MAP.get(c);
             if (mapped != null) {
-                if (mapped != ' ') {
-                    sb.append(mapped);
-                }
+                sb.append(mapped);
             } else if (c >= 'a' && c <= 'z') {
                 sb.append(c);
             }
-            // else skip unknown chars
         }
         return sb.toString();
     }
 
+    public static List<String> generateAlternatives(String input) {
+        List<String> alts = new ArrayList<>();
+        if (input == null) return alts;
+        String lower = input.toLowerCase();
+        String norm = normalize(input);
+
+        // 4 = ch (Russian leet: ч=4)
+        if (lower.contains("4")) {
+            alts.add(normalize(lower.replace("4", "ch")));
+            // Also 4 at different positions
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < lower.length(); i++) {
+                if (lower.charAt(i) == '4') sb.append("ch");
+                else {
+                    String m = CHAR_MAP.get(lower.charAt(i));
+                    if (m != null) sb.append(m);
+                    else if (lower.charAt(i) >= 'a' && lower.charAt(i) <= 'z') sb.append(lower.charAt(i));
+                }
+            }
+            alts.add(sb.toString());
+        }
+        // 6 = b or sh
+        if (lower.contains("6")) {
+            alts.add(normalize(lower.replace("6", "b")));
+            alts.add(normalize(lower.replace("6", "sh")));
+        }
+        // 3 = z (alternative to e)
+        if (lower.contains("3")) {
+            alts.add(normalize(lower.replace("3", "z")));
+        }
+        // ck -> k
+        if (norm.contains("ck")) alts.add(norm.replace("ck", "k"));
+        // ph -> f
+        if (norm.contains("ph")) alts.add(norm.replace("ph", "f"));
+        // doubled letters removed
+        alts.add(removeDoubles(norm));
+        // x -> ks
+        if (norm.contains("x")) alts.add(norm.replace("x", "ks"));
+        // x -> h (Russian x=х)
+        if (lower.contains("x")) alts.add(normalize(lower.replace("x", "h")));
+
+        return alts;
+    }
+
+    private static boolean isSeparator(char c) {
+        return c == '_' || c == '-' || c == '.' || c == ' ' || c == '*'
+            || c == '#' || c == '~' || c == '`' || c == '\''
+            || c == '"' || c == ',' || c == ';' || c == ':'
+            || c == '/' || c == '\\' || c == '<' || c == '>'
+            || c == '^' || c == '=' || c == '%' || c == '&'
+            || c == '\u00a7';
+    }
+
+    private static String removeDoubles(String s) {
+        if (s.length() <= 1) return s;
+        StringBuilder sb = new StringBuilder();
+        sb.append(s.charAt(0));
+        for (int i = 1; i < s.length(); i++) {
+            if (s.charAt(i) != s.charAt(i - 1)) sb.append(s.charAt(i));
+        }
+        return sb.toString();
+    }
+
+    private static String removeVowels(String s) {
+        return s.replaceAll("[aeiou]", "");
+    }
+
     // =====================================================================
     // KEYWORD DATABASES
-    // All keywords must be in normalized latin form (lowercase, no spaces)
     // =====================================================================
 
-    // --- CHEATS, HACKS, MACROS, SOFTWARE ---
     private static final String[] CHEATS = {
-        // Cheat clients
         "wurst", "meteor", "aristois", "impact", "inertia", "lambda",
         "liquidbounce", "sigma", "novoline", "exhibition", "rise",
         "tenacity", "enthium", "azura", "pandaware", "astolfo",
         "zeroday", "hanabi", "sixsense", "wolfram", "kami",
         "salhack", "future", "rusherhack", "konas", "phobos",
         "gamesense", "pyro", "huzuni", "weepcraft", "vape",
-        "cheatbreaker", "badlion", "lunar", "feather",
+        "cheatbreaker",
         "fdpclient", "fdp", "novahack", "skilled",
-        "medusa", "flavor", "flavor", "drip",
-        "antic", "atani", "autumn", "blaze",
-        "crypt", "death", "dream", "eclipse",
-        "flux", "hydra", "lime", "moon",
+        "medusa", "flavor", "drip",
+        "antic", "atani", "autumn",
+        "crypt", "eclipse",
+        "flux", "hydra",
         "neptune", "phantom", "prestige", "remix",
-        "raven", "ravenclient", "ravenb", "ravenb+",
-        "skid", "sleek", "snow", "tap",
+        "raven", "ravenclient", "ravenb",
+        "skid", "sleek",
         "vapor", "xatz", "zephyr",
-        // Cheat functions
-        "killaura", "killaure", "kilaura", "kilaure",
-        "aimbot", "aim bot", "aimassist",
+        "neverlose", "onetap", "skeet", "fatality",
+        "interium", "nixware", "evolve",
+        "aimware", "legendware", "spirthack",
+        "killaura", "kilaura", "killaure", "kilaure",
+        "aimbot", "aimassist",
         "autoclicker", "autoclick", "autoklicker", "autoklick",
-        "xray", "x ray", "xrei", "xray mod",
+        "avtoklik", "avtoclicker", "avtokliker",
+        "xray", "xrei",
         "nuker", "scaffold", "scaff",
-        "flyhack", "fly hack", "flyh4ck",
-        "noclip", "no clip",
-        "antiknockback", "antikb", "anti kb", "nokb",
-        "velocity", "bhop", "bunnyhop", "bunny hop",
-        "triggerbot", "trigger bot",
-        "autototem", "auto totem",
-        "autocrystal", "auto crystal",
-        "automine", "auto mine",
-        "fastplace", "fast place",
-        "fastbreak", "fast break",
-        "freecam", "free cam",
-        "wallhack", "wall hack", "wh",
+        "flyhack",
+        "noclip",
+        "antikb", "nokb", "antiknockback",
+        "velocity", "bhop", "bunnyhop",
+        "triggerbot",
+        "autototem", "autocrystal", "automine",
+        "fastplace", "fastbreak",
+        "freecam",
+        "wallhack",
         "tracers", "tracer",
         "chams", "esp",
         "baritone", "bariton",
-        "speedhack", "speed hack",
-        "highjump", "high jump",
-        "noslowdown", "no slowdown",
-        "nofall", "no fall", "nofalldamage",
-        "jesus", "waterwalk", "water walk",
+        "speedhack",
+        "highjump",
+        "noslowdown", "noslow",
+        "nofall", "nofalldamage",
+        "waterwalk",
         "phase", "phaze",
-        "timer", "timerh4ck",
-        "reach", "longreach", "long reach",
+        "reach", "longreach",
         "hitbox", "hitboxes",
         "criticals", "crits", "autocrit",
         "autosoup", "autopotion", "autopot",
-        "autoarmor", "auto armor",
-        "cheststealer", "chest stealer",
-        "inventorywalk", "inv walk",
-        "step", "stepper",
-        "strafe", "sprint",
-        "safewalk", "safe walk",
-        "antibot", "anti bot",
-        "backtrack", "back track",
-        // General terms
-        "hack", "hacks", "h4ck", "h4cks", "hak", "haks",
-        "cheat", "cheats", "ch3at", "ch34t", "chiter",
-        "chiter", "cheater", "hacker", "haker",
-        "exploit", "eksploit", "expl0it",
-        "dupe", "duper", "duping", "dup",
+        "autoarmor",
+        "cheststealer",
+        "inventorywalk",
+        "safewalk",
+        "antibot",
+        "backtrack",
+        "hack", "hacks", "hak", "haks",
+        "cheat", "cheats", "chiter", "cheater",
+        "hacker", "haker", "hackerman",
+        "exploit", "eksploit",
+        "dupe", "duper", "duping",
         "inject", "injector", "inzhekt",
-        "macro", "makro", "makros", "macros",
-        "autokliker", "avtokliker",
+        "macro", "makro", "makros",
         "chity", "chiti",
-        "haki", "khaki",
-        "vzlom", "vzl0m",
-        "obd", "obhod",
-        "soft", "s0ft",
-        // RU transliterated
-        "aimbot", "killaura",
-        "avtoklik", "avtoclicker",
-        "makros", "makro",
-        "eksploit", "dyp", "dyup",
-        "inzhekt", "inzekt"
+        "haki",
+        "vzlom",
+        "obhod",
+        "clicker", "kliker",
+        "autofarm", "autofish", "autoeat",
+        "fullbright",
+        "blink", "disabler",
+        "antiafk",
+        "ghostclient",
+        "closetcheater"
     };
 
-    // --- PROFANITY (RU transliterated + EN) ---
     private static final String[] PROFANITY = {
-        // Russian mat (transliterated to latin)
-        "hui", "huy", "huj", "huй",
-        "huya", "huyu", "huei", "hue",
-        "huilo", "huylo", "huesos",
+        // HUI family
+        "hui", "huy", "huj", "hue", "huya", "huyu", "huei",
+        "huilo", "huylo", "huesos", "hueta", "hueviy",
+        "huynya", "huinya", "huev",
+        "nahui", "nahuy", "nahuj",
+        "poshyolnahui", "idnahui", "idinahui",
+        "ohuel", "ohuet", "ohuyel",
+        // PIZD family
         "pizd", "pizda", "pizdec", "pizdos", "pizdez",
-        "pizdato", "pizduk", "pizdet",
+        "pizdato", "pizduk", "pizdet", "pizdish",
+        "pizdabol",
+        "raspizday", "raspizdyai",
+        "pripizd", "zapizd", "otpizd",
+        "spizd", "spizdil",
+        // BLYAT family
         "blyat", "bliat", "blad", "blyad", "blya",
-        "blyad", "bljat", "blyt", "blet",
+        "bljat", "blyt", "blet", "blyadi",
+        "blyaha", "blyadina", "blyadstvo",
+        "blyadskiy",
+        // EBAT family
         "ebat", "eban", "ebal", "ebash", "ebuch",
-        "ebanat", "ebanko", "ebanyi",
-        "yobany", "yoban", "yob",
+        "ebanat", "ebanko", "ebanyi", "ebaniy",
+        "ebanashka", "ebanutiy",
+        "ebalo", "ebanul", "ebashit",
+        "zaebat", "zaeb", "zaebis", "zaebali", "zaebal",
+        "proeb", "proebal",
+        "ueb", "ueban", "uebok", "uebische",
+        "vyeb", "vyebal",
+        "doeb", "doebal",
+        "oteb", "otebal",
+        "poeb", "poebal",
+        "razeb", "razebal",
+        "eblan", "eblanysh",
+        // YOBANIY family
+        "yoban", "yobany", "yobaniy", "yob",
+        // SUKA family
         "suka", "suchka", "suchar", "suchara",
-        "syki", "s00ka", "suca",
-        "mudak", "mudila", "mudo", "mudak",
-        "mudozv", "mudila",
-        "zalupa", "zalup", "zalepa",
+        "syki", "suca", "sukablyat",
+        "sukiny", "sukin",
+        // MUDAK family
+        "mudak", "mudila", "mudo", "mudozv",
+        "mudozvon",
+        // ZALUP family
+        "zalupa", "zalup",
+        // DOLBOEB family
         "dolboeb", "dolboyob", "dolboed",
+        // SHLUHA family
         "shluh", "shlukha", "shluha",
         "shalav", "shalava",
+        // PIDOR family
         "pidor", "pidar", "pidr", "pederast",
-        "pedik", "peder", "pid0r", "pid4r", "pid",
-        "gandon", "gondon", "gand0n", "g0nd0n", "prezervativ",
+        "pedik", "peder",
+        "pidoras", "pidaras", "pidrila",
+        // GONDON family
+        "gandon", "gondon",
+        // DROCHIT family
         "droch", "drochi", "drochit", "drochila",
+        "nadroch", "zadroch",
+        // ZHOPA family
         "zhopa", "zhop", "zhopu", "zhope",
+        "zhopoliz",
+        // SRAT family
         "srat", "sral", "sran", "sraka",
-        "govno", "govnya", "goven", "g0vn0", "gavno",
-        "dermo", "derm",
-        "potrah", "trah", "trahat",
-        "sperma", "hren", "chlen",
-        "manda", "mande", "mandi",
-        "uebok", "uebische", "uebki",
-        "perdun", "perdet",
+        "nasrat", "obsrat", "usrat",
         "zasranec", "zasranka",
+        // GOVNO family
+        "govno", "govnya", "goven", "gavno",
+        "govnoed",
+        // DERMO family
+        "dermo", "derm",
+        // CHLEN family
+        "chlen", "chlenov", "chleny",
+        "chlenososkа",
+        // HREN family
+        "hren", "hrenov",
+        "nahren", "ohrenet",
+        // MANDA family
+        "manda", "mande", "mandi",
+        // PERD family
+        "perdun", "perdet",
+        // TRAH family
+        "potrah", "trah", "trahat", "trahnut",
+        // SPERMA
+        "sperma",
         // English profanity
         "fuck", "fck", "fuk", "fuc", "phuck", "phuk",
         "fucker", "fucked", "fucking", "fuckoff",
-        "motherfucker", "mofo", "mthrfckr",
+        "motherfucker", "mofo",
+        "fuckboy", "fucktard",
         "shit", "sht", "shiit", "shiet", "shyt",
-        "shitty", "bullshit",
+        "shitty", "bullshit", "dipshit", "shithead",
         "bitch", "bich", "biatch", "bytch",
-        "ass", "arse", "asshol", "asshole",
-        "damn", "dammit",
-        "dick", "dik", "dixk", "d1ck", "dikk",
-        "pussy", "pusi", "pusy", "pussi",
-        "penis", "penls", "pen1s",
-        "vagina", "vagin", "vag",
-        "cock", "cok", "c0ck", "c0k",
-        "cunt", "c0nt", "kunt",
-        "whore", "hore", "w h o r e",
-        "slut", "sl00t", "sl0t",
-        "bastard", "bastrd",
-        "nigger", "niger", "n1gger", "nigg3r", "n1gg3r",
-        "nigga", "niga", "n1gga", "nigg4",
-        "faggot", "fagot", "fagt", "phag",
-        "fag", "f4g",
-        "retard", "retarded", "r3tard", "ret4rd",
-        "stfu", "gtfo", "lmfao",
+        "asshole",
+        "damn", "dammit", "goddamn",
+        "dick", "dik", "dixk",
+        "dickhead",
+        "pussy", "pusi", "pusy",
+        "penis",
+        "vagina", "vagin",
+        "cock", "cok",
+        "cocksucker",
+        "cunt", "kunt",
+        "whore", "hore",
+        "slut",
+        "bastard",
+        "nigger", "niger",
+        "nigga", "niga",
+        "faggot", "fagot",
+        "retard", "retarded",
         "wanker", "wank", "tosser",
-        "twat", "tw4t",
-        "prick", "pr1ck",
-        "douche", "d0uche",
-        "dildo", "dild0",
+        "twat",
+        "prick",
+        "douche",
         "jerkoff", "jackoff",
         "cum", "cumshot",
-        "blowjob", "bl0wjob",
+        "blowjob",
         "handjob",
-        // Mixed RU-EN bypasses
-        "cyka", "сука", "cyка",
-        "bl9t", "bl9d",
-        "p1zda", "p1zd",
-        "3bat", "3bal",
-        "x y i", "x u i", "x u y",
-        "p i z d",
-        "b l y a",
-        "e b a l",
-        "s u k a"
+        "cyka",
+        "pizdabolshy", "ebanina",
+        "konchita", "konch", "konchit", "konchay",
+        "govnyany", "sranyy"
     };
 
-    // --- INSULTS ---
     private static final String[] INSULTS = {
-        // RU transliterated
-        "debil", "deb1l", "debik",
-        "idiot", "idi0t", "1diot",
+        "debil", "debik", "debiloid",
+        "idiot", "idioty",
         "kretin", "kretinka",
-        "imbecil", "imbecill",
+        "imbecil",
         "tupoi", "tupoy", "tupica", "tupitsa",
-        "loh", "l0h", "lohar", "loshar", "loshara",
-        "nub", "noub", "n00b", "newb", "nubik", "nubyara",
-        "chmo", "chmoshnik", "chm0",
+        "loh", "lohar", "loshar", "loshara", "loshok",
+        "loshped",
+        "nub", "noub", "nubik", "nubyara",
+        "nubas",
+        "chmo", "chmoshnik",
         "ubludok", "ublyudok",
         "vyrodok", "virodok",
         "otbros", "otbrosy",
-        "mraz", "mrazota", "mrazish",
+        "mraz", "mrazota", "mrazish", "mrazi",
         "tvar", "tvari",
-        "podonok", "pad0nok",
-        "urod", "ur0d", "urodina",
-        "bydlo", "bydl", "bydl0",
-        "daun", "d4un", "down",
-        "autist", "aut1st",
-        "durak", "dura", "duren", "dur4k",
-        "kozel", "k0zel", "kozlina",
-        "skotina", "skot", "sk0t",
-        "gnida", "gn1da",
+        "podonok", "podonki",
+        "urod", "urodina", "urody",
+        "bydlo", "bydlyak",
+        "daun", "dauny", "daunism",
+        "autist", "autizm",
+        "durak", "dura", "duren", "durdom",
+        "durochka",
+        "kozel", "kozlina", "kozly",
+        "skotina", "skot", "skoty",
+        "gnida", "gnidy",
         "padla", "padlo",
-        "paskuda", "paskud",
-        "churka", "ch00rka",
-        "hach", "khach",
-        "churban", "ch00rban",
-        "ped0fil", "pedofil",
-        "zoofil", "z00fil",
+        "paskuda", "paskudina",
+        "churka", "churki", "churban",
+        "hach", "khach", "hachik",
+        "pedofil",
+        "zoofil",
         "necrofil",
         "vyblyadok",
-        "pridurok", "prid00rok",
-        "eblан", "eblan",
-        "pizduk",
-        "zhirn", "zhirnyi", "zhirtryes",
-        "bomzh", "b0mzh",
-        "bich", "bichara",
-        "svoloch", "sv0loch",
-        "negodyai", "neg0dyai",
-        "shavka",
+        "pridurok", "pridurki",
+        "zhirn", "zhirnyi", "zhirtrest",
+        "zhirnyara",
+        "bomzh", "bomzhara",
+        "bichara",
+        "svoloch", "svolochi",
+        "negodyai",
+        "shavka", "shavki",
         "psih", "psikh", "psikhopat",
-        "shizofrenik", "shiz",
-        // English insults
-        "noob", "n00b", "nub", "newbie",
-        "trash", "tr4sh", "garbage",
-        "loser", "l0ser", "looser",
-        "idiot", "idi0t", "1diot",
-        "moron", "m0ron",
-        "stupid", "stup1d", "stoopid",
-        "dumb", "dumba", "dumbass",
+        "shizofrenik", "shiz", "shiza",
+        "oligofren",
+        "obezyana",
+        "baran",
+        "osel", "ishak",
+        "svin", "svinya",
+        "gadina", "gad", "gady",
+        "parasit", "parazit",
+        "ushlepok",
+        "shmara",
+        "zhulik",
+        "podlets", "podlyi",
+        "noob", "nub", "newbie",
+        "trash", "garbage",
+        "loser", "looser",
+        "moron",
+        "stupid", "stoopid",
+        "dumb", "dumbass",
         "lame", "lameo", "lamer",
-        "pathetic", "pathetik",
-        "cringe", "cringer",
-        "toxic", "tox1c",
-        "rat", "r4t",
-        "dog", "dawg",
-        "pig", "p1g",
-        "monkey", "m0nkey",
-        "clown", "cl0wn",
-        "simp", "s1mp",
-        "virgin", "v1rgin",
-        "incel", "1ncel",
-        "nerd", "n3rd",
-        "geek", "g33k",
-        "bot", "b0t",
-        "braindead", "brainded"
+        "pathetic",
+        "cringe",
+        "toxic",
+        "clown",
+        "simp",
+        "virgin",
+        "incel",
+        "nerd",
+        "braindead",
+        "degenerate", "degen",
+        "scumbag", "scum",
+        "filth", "filthy",
+        "worthless",
+        "disgrace", "disgusting",
+        "peasant",
+        "coward",
+        "creep",
+        "freak",
+        "psycho",
+        "lunatic",
+        "imbecile",
+        "dimwit", "halfwit", "nitwit",
+        "bonehead",
+        "knobhead",
+        "bellend",
+        "muppet",
+        "plonker",
+        "numpty",
+        "donkey", "jackass"
     };
 
-    // --- POLITICS ---
     private static final String[] POLITICS = {
-        // Politicians
-        "putin", "put1n", "puten", "pytin",
+        "putin", "putler",
         "zelensky", "zelenskiy", "zelenskii", "zelensk",
-        "biden", "b1den", "bayden",
-        "trump", "tramp", "tr4mp",
-        "navalny", "navalnyi", "naval",
-        "lukashenko", "lukashenk", "lukash",
-        "stalin", "stal1n", "stаlin",
-        "lenin", "len1n",
-        "hitler", "h1tler", "gitler", "g1tler", "adolph",
-        "mussolini", "mussolin",
+        "biden", "bayden",
+        "trump", "tramp",
+        "navalny", "navalnyi",
+        "lukashenko", "lukash",
+        "stalin",
+        "lenin",
+        "hitler", "gitler", "adolph",
+        "mussolini",
         "poroshenko", "porosh",
         "merkel",
         "macron", "makron",
-        "obama", "0bama",
-        "xi jinping", "xijinping",
-        // Countries/regions (political context)
-        "ukraine", "ukrain", "ukraina",
-        "russia", "rusia", "rusnya", "rashka", "raska",
-        "rossiya", "rossia",
-        "nato", "n4to", "nato",
+        "obama",
+        "xijinping", "jinping",
+        "kimjongun",
+        "pinochet",
+        "castro",
+        "cheguevara",
+        "gorbachev",
+        "khrushchev", "hruschev",
+        "brezhnev",
+        "yeltsin", "eltsyn",
+        "medvedev",
+        "lavrov",
+        "shoigu",
+        "ukraine", "ukrain", "ukraina", "ukry", "ukrop",
+        "rusnya", "rashka", "raska",
         "crimea", "krim", "krym",
-        "donbass", "donbas", "d0nbass",
-        "donetsk", "d0netsk",
-        "lugansk", "luhansk",
-        "dnr", "lnr",
-        "mariupol", "mariup0l",
-        "bucha",
-        "moscow", "moskva", "moskow",
-        "kiev", "kyiv",
-        "usa",
-        // Ideologies and terms
-        "fascism", "fashizm", "fashist", "fascist",
-        "nazism", "nazizm", "nazi", "naz1", "n4zi",
-        "neonazi", "neonazist",
-        "swastika", "svastika", "svastica",
-        "communist", "kommunizm", "kommunist",
-        "propaganda", "prop4ganda",
-        "terrorist", "terror1st", "terrorizm",
-        "genocide", "genocid", "genozid",
-        "holocaust", "holokost", "holokaust",
-        "war", "voina", "voyna",
-        "zieg", "sieg", "z1eg",
-        "heil", "he1l", "hayl",
-        "reich", "reih", "r3ich",
-        "fuhrer", "fyurer",
-        "bandera", "bander",
-        "azov", "az0v",
+        "donbass", "donbas",
+        "donetsk", "lugansk", "luhansk",
+        "mariupol", "bucha",
+        "chechnya", "ichkeria",
+        "dagestan",
+        "abkhaziya", "osetiya",
+        "palestina", "palestine", "izrail",
+        "azov",
         "wagner", "vagner",
-        "kadyrov", "kadyr0v",
-        "zhirinovsky", "zhirinovsk",
-        "shoigu", "sh01gu"
+        "kadyrov",
+        "prigozhin",
+        "girkin", "strelkov",
+        "fascism", "fashizm", "fashist", "fascist",
+        "nazism", "nazizm", "nazi",
+        "neonazi",
+        "swastika", "svastika",
+        "kommunizm", "kommunist",
+        "propaganda",
+        "terrorist", "terrorizm",
+        "genocide", "genocid", "genozid",
+        "holocaust", "holokost",
+        "voina", "voyna",
+        "zieg", "sieg",
+        "heil", "hayl",
+        "reich", "reih",
+        "fuhrer", "fyurer",
+        "bandera", "bander", "banderovets",
+        "vlasov", "vlasovets",
+        "denazifikatsiya",
+        "spetsoperatsiya",
+        "krimnash",
+        "zhirinovsky", "zhirinovsk"
     };
 
-    // --- NSFW / 18+ ---
     private static final String[] NSFW = {
-        // Porn
-        "porn", "p0rn", "prn", "pron", "pr0n",
-        "porno", "p0rno", "porn0",
-        "hentai", "henta1", "hent4i", "h3ntai",
-        "ecchi", "3cchi",
-        "sex", "s3x", "sexx", "secks", "seks",
-        "erotic", "erotik", "erotika", "er0tic",
-        "onlyfans", "0nlyfans", "onlyf4ns",
+        "porn", "prn", "pron",
+        "porno",
+        "hentai",
+        "ecchi",
+        "sex", "seks",
+        "erotic", "erotik", "erotika",
+        "onlyfans",
         "fansly",
-        // Porn sites
-        "pornhub", "p0rnhub", "pornhab",
-        "xvideos", "xvideo", "xvideo",
-        "xhamster", "xh4mster",
-        "brazzers", "brazers", "br4zzers",
-        "chaturbate", "ch4turbate",
-        "stripchat", "str1pchat",
-        "rule34", "r34", "rule 34",
-        "nhentai", "nhenta1",
+        "pornhub", "pornhab",
+        "xvideos", "xvideo",
+        "xhamster",
+        "brazzers", "brazers",
+        "chaturbate",
+        "stripchat",
+        "rule34",
+        "nhentai",
         "gelbooru", "danbooru",
         "e621",
-        // Terms
-        "nsfw", "n5fw",
+        "redtube",
+        "youporn",
+        "xnxx",
+        "motherless",
+        "spankbang",
+        "nsfw",
         "xxx", "xxxx",
-        "striptease", "str1ptease", "striptiz",
-        "blowjob", "bl0wjob", "bj",
-        "anal", "an4l", "analsex",
-        "orgy", "0rgy", "orgiya",
-        "fetish", "fet1sh", "fetich",
-        "bdsm", "bd5m",
+        "striptease", "striptiz",
+        "blowjob",
+        "anal", "analsex",
+        "orgy", "orgiya",
+        "fetish", "fetich",
+        "bdsm",
         "lesbian", "lesbi", "lezbi",
-        "gay", "g4y", "gey",
-        "trans", "tr4ns", "tranny",
-        "furry", "furri", "f00rri",
-        "yaoi", "ya0i", "yaooi",
-        "yuri", "yur1",
-        "milf", "m1lf",
-        "dildo", "d1ldo", "dild0",
-        "vibrator", "vibr4tor",
-        "orgasm", "0rgasm", "orgazm",
-        "masturbat", "masturb", "fap",
+        "gay", "gey",
+        "tranny",
+        "furry", "furri",
+        "yaoi",
+        "yuri",
+        "milf",
+        "dildo",
+        "vibrator",
+        "orgasm", "orgazm",
+        "masturbat", "masturb",
         "bukkake", "bukake",
-        "creampie", "cream pie",
-        "gangbang", "g4ngbang",
-        "deepthroat", "deep throat",
-        "bondage", "b0ndage",
-        "dominat", "d0minat",
+        "creampie",
+        "gangbang",
+        "deepthroat",
+        "bondage",
+        "dominat",
         "submissiv",
         "sadism", "sadist",
         "masochis", "mazohis",
-        "voyeur", "v0yeur",
+        "voyeur",
         "exhibitionist",
-        "incest", "1ncest",
-        "lolicon", "loli", "l0li",
-        "shotacon", "shota", "sh0ta",
-        "ahegao", "aheg40",
-        "waifu", "wa1fu",
-        "harem", "har3m",
-        "tentacle", "tent4cle",
+        "incest",
+        "lolicon", "loli",
+        "shotacon", "shota",
+        "ahegao",
+        "waifu",
+        "harem",
+        "tentacle",
         "futanari", "futa",
-        "trap",
-        // RU transliterated
-        "porno", "seks", "prostitutka", "blyad",
-        "striptiz", "razvrat", "razvrash",
-        "intim", "1ntim",
-        "sosat", "s0sat",
-        "drochit", "droch",
-        "konchit", "konch",
+        "prostitutka", "prostit",
+        "razvrat", "razvrash",
+        "intim",
+        "sosat",
         "trahnut", "trahat",
-        "ebat", "ebal",
-        "shalava", "prostitut",
-        "putana", "kurva",
-        "kurwa"
+        "shalava",
+        "putana", "kurva", "kurwa",
+        "shlyuha", "shluha",
+        "minyet", "minet",
+        "gruppovuha",
+        "svinger"
     };
 
-    // --- SERVER RULE VIOLATIONS ---
     private static final String[] SERVER_RULES = {
-        // Griefing/trolling
-        "grief", "gr1ef", "griefer",
-        "troll", "tr0ll",
-        "spam", "sp4m", "spammer",
-        "flood", "fl00d",
-        "abuse", "ab00se", "abuz",
-        "bug", "b00g", "bugged",
-        "glitch", "gl1tch",
-        "scam", "sc4m", "skam", "scamer", "scammer",
-        "steal", "st34l",
-        "tos", "t0s",
-        // Threats/violence
-        "kill", "keel",
-        "die", "d1e",
-        "death", "d34th",
-        "murder", "murd3r",
+        "grief", "griefer", "griefing",
+        "troll", "trolling",
+        "spam", "spammer", "spamming",
+        "flood", "flooding",
+        "abuse", "abuz", "abusing",
+        "glitch", "glitching",
+        "scam", "skam", "scammer", "scamming",
+        "steal", "stealing",
+        "murder",
         "suicide", "suicid",
-        "rape", "r4pe", "r4p3",
-        "bomb", "b0mb",
-        "shoot", "sh00t",
-        // Drugs
-        "weed", "w33d",
-        "marijuana", "marihuana",
-        "cocaine", "c0caine", "kokain",
-        "heroin", "her01n", "geroin",
-        "drug", "dr00g", "narkotik",
-        "meth", "m3th", "metamfetamin",
-        "lsd",
-        "mushroom", "grib", "griby",
-        "crack",
-        // Gambling (if server forbids)
-        "casino", "cas1no", "kazino",
-        "bet", "b3t",
-        // Doxxing
-        "dox", "doxx", "d0x",
-        "swat", "sw4t", "swatting",
-        "ddos", "dd0s",
-        "ip", "1p",
-        "leak", "l34k",
-        // Advertising
-        "discord", "disc0rd",
-        "telegram", "teleg", "tg",
-        "vk.com", "vkcom",
-        // Misc
-        "report", "rep0rt",
-        "toxic", "t0xic",
-        "cancer", "c4ncer", "rak",
-        "aids", "a1ds", "spid",
-        "covid", "c0vid", "korona",
-        "ebola", "eb0la"
+        "rape",
+        "bomb", "bombing",
+        "threat",
+        "weed",
+        "marijuana",
+        "cocaine", "kokain",
+        "heroin", "geroin",
+        "narkotik", "narkota",
+        "meth", "metamfetamin",
+        "amfetamin",
+        "ekstazi", "ecstasy",
+        "gashish", "hashish",
+        "opium",
+        "casino", "kazino",
+        "doxx",
+        "swat", "swatting",
+        "ddos",
+        "discord",
+        "telegram",
+        "cancer", "rak",
+        "aids", "spid",
+        "covid", "korona",
+        "ebola",
+        "selfharm",
+        "anorexia",
+        "obman", "moshennik",
+        "multiakk", "multiaccount",
+        "tvink"
     };
+
+    // Short words: exact match only to avoid false positives
+    private static final Set<String> SHORT_EXACT_ONLY = new HashSet<>(Arrays.asList(
+        "rat", "pig", "dog", "gay", "fag", "ass", "cum",
+        "bug", "wh", "esp", "bot", "gad", "lsd",
+        "dnr", "lnr", "rak", "yob", "hue"
+    ));
 
     // =====================================================================
-    // MAIN CHECK METHOD
+    // MAIN CHECK
     // =====================================================================
 
     public static List<ViolationResult> checkClanName(String clanName, int slot) {
         List<ViolationResult> results = new ArrayList<>();
         if (clanName == null || clanName.isEmpty()) return results;
 
-        // Create multiple representations for checking
-        String lower = clanName.toLowerCase();
+        String lower = clanName.toLowerCase().replaceAll("[\\s_\\-.]", "");
         String normalized = normalize(clanName);
-
-        // Also try without vowels (common bypass)
         String noVowels = removeVowels(normalized);
+        String noDoubles = removeDoubles(normalized);
+        List<String> alternatives = generateAlternatives(clanName);
 
-        // Check all categories
-        checkCategory(clanName, lower, normalized, noVowels, CHEATS, "Cheats", slot, results);
-        checkCategory(clanName, lower, normalized, noVowels, PROFANITY, "Profanity", slot, results);
-        checkCategory(clanName, lower, normalized, noVowels, INSULTS, "Insults", slot, results);
-        checkCategory(clanName, lower, normalized, noVowels, POLITICS, "Politics", slot, results);
-        checkCategory(clanName, lower, normalized, noVowels, NSFW, "NSFW", slot, results);
-        checkCategory(clanName, lower, normalized, noVowels, SERVER_RULES, "Server Rules", slot, results);
+        checkCategory(clanName, lower, normalized, noVowels, noDoubles, alternatives,
+                CHEATS, "Cheats", slot, results);
+        checkCategory(clanName, lower, normalized, noVowels, noDoubles, alternatives,
+                PROFANITY, "Profanity", slot, results);
+        checkCategory(clanName, lower, normalized, noVowels, noDoubles, alternatives,
+                INSULTS, "Insults", slot, results);
+        checkCategory(clanName, lower, normalized, noVowels, noDoubles, alternatives,
+                POLITICS, "Politics", slot, results);
+        checkCategory(clanName, lower, normalized, noVowels, noDoubles, alternatives,
+                NSFW, "NSFW", slot, results);
+        checkCategory(clanName, lower, normalized, noVowels, noDoubles, alternatives,
+                SERVER_RULES, "Server Rules", slot, results);
 
         return results;
     }
 
     private static void checkCategory(String original, String lower, String normalized,
-                                       String noVowels, String[] keywords, String category,
+                                       String noVowels, String noDoubles,
+                                       List<String> alternatives,
+                                       String[] keywords, String category,
                                        int slot, List<ViolationResult> results) {
         for (String keyword : keywords) {
-            String normalizedKeyword = normalize(keyword);
-            if (normalizedKeyword.isEmpty()) {
-                normalizedKeyword = keyword.toLowerCase()
-                        .replace(" ", "").replace("_", "")
-                        .replace("-", "").replace(".", "");
+            String normKw = normalize(keyword);
+            if (normKw.isEmpty()) {
+                normKw = keyword.toLowerCase().replaceAll("[\\s_\\-.]", "");
             }
+            if (normKw.length() < 2) continue;
 
-            // Check in normalized form (main check)
-            if (normalized.contains(normalizedKeyword)) {
-                results.add(new ViolationResult(original, category, keyword, slot));
-                return;
-            }
+            boolean shortExact = SHORT_EXACT_ONLY.contains(keyword.toLowerCase())
+                || normKw.length() <= 3;
 
-            // Check in original lowercase (for exact matches)
-            String lowerKeyword = keyword.toLowerCase().replace(" ", "");
-            if (lower.replace(" ", "").replace("_", "").replace("-", "").contains(lowerKeyword)) {
-                results.add(new ViolationResult(original, category, keyword, slot));
-                return;
-            }
-
-            // Check without vowels (catches "fck", "btch", etc.)
-            if (normalizedKeyword.length() >= 3) {
-                String kwNoVowels = removeVowels(normalizedKeyword);
-                if (kwNoVowels.length() >= 3 && noVowels.contains(kwNoVowels)) {
+            if (shortExact) {
+                if (normalized.equals(normKw) || lower.equals(normKw)
+                    || noDoubles.equals(normKw)) {
                     results.add(new ViolationResult(original, category, keyword, slot));
                     return;
                 }
+                for (String alt : alternatives) {
+                    if (alt.equals(normKw)) {
+                        results.add(new ViolationResult(original, category, keyword, slot));
+                        return;
+                    }
+                }
+            } else {
+                if (normalized.contains(normKw)) {
+                    results.add(new ViolationResult(original, category, keyword, slot));
+                    return;
+                }
+                String lowerKw = keyword.toLowerCase().replaceAll("[\\s_\\-.]", "");
+                if (lower.contains(lowerKw)) {
+                    results.add(new ViolationResult(original, category, keyword, slot));
+                    return;
+                }
+                String noDblKw = removeDoubles(normKw);
+                if (noDblKw.length() >= 3 && noDoubles.contains(noDblKw)) {
+                    results.add(new ViolationResult(original, category, keyword, slot));
+                    return;
+                }
+                if (normKw.length() >= 4) {
+                    String nvKw = removeVowels(normKw);
+                    if (nvKw.length() >= 3 && noVowels.contains(nvKw)) {
+                        results.add(new ViolationResult(original, category, keyword, slot));
+                        return;
+                    }
+                }
+                for (String alt : alternatives) {
+                    if (alt.contains(normKw)) {
+                        results.add(new ViolationResult(original, category, keyword, slot));
+                        return;
+                    }
+                }
             }
         }
-    }
-
-    private static String removeVowels(String s) {
-        return s.replaceAll("[aeiou]", "");
     }
 }
